@@ -2,7 +2,7 @@
 
 # Mzansi FX VIP Signal Bot - Deployment Script
 # Usage: ./deploy.sh [command]
-# Commands: setup, start, stop, restart, logs, status
+# Commands: setup, start, stop, restart, logs, status, install-docker
 
 set -e
 
@@ -18,25 +18,60 @@ log() { echo -e "${GREEN}[INFO]${NC} $1"; }
 warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
+# Detect docker compose command (v2 or v1)
+COMPOSE_CMD=""
+detect_compose() {
+    if docker compose version &> /dev/null 2>&1; then
+        COMPOSE_CMD="docker compose"
+    elif command -v docker-compose &> /dev/null; then
+        COMPOSE_CMD="docker-compose"
+    else
+        return 1
+    fi
+    return 0
+}
+
+# Install Docker and Docker Compose
+install_docker() {
+    log "Installing Docker..."
+    curl -fsSL https://get.docker.com -o get-docker.sh
+    sudo sh get-docker.sh
+    rm get-docker.sh
+
+    log "Adding user to docker group..."
+    sudo usermod -aG docker $USER
+
+    log "Installing Docker Compose plugin..."
+    sudo apt-get update
+    sudo apt-get install -y docker-compose-plugin
+
+    log "Starting Docker service..."
+    sudo systemctl enable docker
+    sudo systemctl start docker
+
+    log "Docker installed successfully!"
+    log "Please log out and back in (or run 'newgrp docker') to use docker without sudo."
+    log "Then run: ./deploy.sh setup"
+}
+
 # Check if Docker is installed
 check_docker() {
     if ! command -v docker &> /dev/null; then
-        error "Docker is not installed. Installing..."
-        curl -fsSL https://get.docker.com -o get-docker.sh
-        sudo sh get-docker.sh
-        sudo usermod -aG docker $USER
-        rm get-docker.sh
-        log "Docker installed. Please log out and back in, then run this script again."
+        error "Docker is not installed."
+        log "Run: ./deploy.sh install-docker"
         exit 1
     fi
 }
 
 # Check if docker-compose is available
 check_compose() {
-    if ! docker compose version &> /dev/null; then
-        error "Docker Compose is not available"
+    if ! detect_compose; then
+        error "Docker Compose is not available."
+        log "Run: sudo apt-get install -y docker-compose-plugin"
+        log "Or run: ./deploy.sh install-docker"
         exit 1
     fi
+    log "Using: $COMPOSE_CMD"
 }
 
 # Setup environment
@@ -61,7 +96,7 @@ setup() {
     fi
 
     log "Building Docker image..."
-    docker compose build
+    $COMPOSE_CMD build
 
     log "Setup complete! Run: ./deploy.sh start"
 }
@@ -69,37 +104,37 @@ setup() {
 # Start the bot
 start() {
     log "Starting Signal Bot..."
-    docker compose up -d
+    $COMPOSE_CMD up -d
     log "Bot started! Check logs: ./deploy.sh logs"
 }
 
 # Stop the bot
 stop() {
     log "Stopping Signal Bot..."
-    docker compose down
+    $COMPOSE_CMD down
     log "Bot stopped."
 }
 
 # Restart the bot
 restart() {
     log "Restarting Signal Bot..."
-    docker compose restart
+    $COMPOSE_CMD restart
     log "Bot restarted!"
 }
 
 # View logs
 logs() {
-    docker compose logs -f --tail=100
+    $COMPOSE_CMD logs -f --tail=100
 }
 
 # Check status
 status() {
     echo ""
     log "Container Status:"
-    docker compose ps
+    $COMPOSE_CMD ps
     echo ""
     log "Recent Logs:"
-    docker compose logs --tail=20
+    $COMPOSE_CMD logs --tail=20
 }
 
 # Update and restart
@@ -108,38 +143,52 @@ update() {
     git pull origin main
 
     log "Rebuilding container..."
-    docker compose build --no-cache
+    $COMPOSE_CMD build --no-cache
 
     log "Restarting bot..."
-    docker compose up -d
+    $COMPOSE_CMD up -d
 
     log "Update complete!"
 }
 
 # Main
-check_docker
-check_compose
-
 case "${1:-}" in
+    install-docker)
+        install_docker
+        ;;
     setup)
+        check_docker
+        check_compose
         setup
         ;;
     start)
+        check_docker
+        check_compose
         start
         ;;
     stop)
+        check_docker
+        check_compose
         stop
         ;;
     restart)
+        check_docker
+        check_compose
         restart
         ;;
     logs)
+        check_docker
+        check_compose
         logs
         ;;
     status)
+        check_docker
+        check_compose
         status
         ;;
     update)
+        check_docker
+        check_compose
         update
         ;;
     *)
@@ -148,13 +197,14 @@ case "${1:-}" in
         echo "Usage: ./deploy.sh [command]"
         echo ""
         echo "Commands:"
-        echo "  setup    - Initial setup (build image)"
-        echo "  start    - Start the bot"
-        echo "  stop     - Stop the bot"
-        echo "  restart  - Restart the bot"
-        echo "  logs     - View live logs"
-        echo "  status   - Check bot status"
-        echo "  update   - Pull updates and restart"
+        echo "  install-docker  - Install Docker & Docker Compose"
+        echo "  setup           - Initial setup (build image)"
+        echo "  start           - Start the bot"
+        echo "  stop            - Stop the bot"
+        echo "  restart         - Restart the bot"
+        echo "  logs            - View live logs"
+        echo "  status          - Check bot status"
+        echo "  update          - Pull updates and restart"
         echo ""
         ;;
 esac
