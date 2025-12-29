@@ -1,0 +1,14 @@
+{
+  "name": "gold-scalping-bot",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev:landing": "pnpm --filter landing dev",
+    "dev:bot": "pnpm --filter signal-bot dev",
+    "build:landing": "pnpm --filter landing build",
+    "build:bot": "pnpm --filter signal-bot build"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}

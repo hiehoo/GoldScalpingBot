@@ -1,0 +1,8 @@
+packages:
+  - apps/*
+
+ignoredBuiltDependencies:
+  - canvas
+  - esbuild
+  - sharp
+  - unrs-resolver

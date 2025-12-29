@@ -1,0 +1,258 @@
+@import "tailwindcss";
+
+:root {
+  /* ===== MZANSI FX VIP - BLACK GOLD BULL COLOR SCHEME ===== */
+  /* 60% Dark (Background) */
+  --background: #0D0D0D;
+  --background-secondary: #0A192F;
+
+  /* 30% Light (Text) */
+  --foreground: #FFFFFF;
+  --foreground-muted: #E0E0E0;
+
+  /* 10% Accent - Gold (Luxury) */
+  --primary: #FFD700;
+  --primary-hover: #FFDF33;
+  --primary-glow: rgba(255, 215, 0, 0.25);
+
+  /* Secondary - Dark Navy */
+  --secondary: #0F1A2A;
+  --secondary-hover: #162338;
+
+  /* Accent - Bullish Neon Green (Action) */
+  --accent: #00E396;
+  --accent-bright: #39FF14;
+  --accent-muted: rgba(0, 227, 150, 0.15);
+
+  /* Danger - Bearish Red */
+  --danger: #FF4444;
+
+  /* SA Pride */
+  --sa-green: #007749;
+  --sa-gold: #FFD700;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-background-secondary: var(--background-secondary);
+  --color-foreground: var(--foreground);
+  --color-foreground-muted: var(--foreground-muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-secondary: var(--secondary);
+  --color-accent: var(--accent);
+  --color-danger: var(--danger);
+  --font-sans: var(--font-roboto);
+  --font-display: var(--font-montserrat);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* Hero - Deep black with subtle gold glow */
+.gradient-hero {
+  background: linear-gradient(180deg, #0D0D0D 0%, #0A192F 100%);
+  position: relative;
+}
+
+.gradient-hero::before {
+  content: '';
+  position: absolute;
+  top: 10%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 600px;
+  height: 400px;
+  background: radial-gradient(ellipse, rgba(255, 215, 0, 0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Gold gradient text - VIP luxury feel */
+.gradient-gold {
+  background: linear-gradient(135deg, #FFD700 0%, #FFC107 50%, #FFD700 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Green gradient text - Bullish profits */
+.gradient-green {
+  background: linear-gradient(135deg, #00E396 0%, #39FF14 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* ===== BUTTONS - 10% Accent Rule ===== */
+
+/* Primary CTA - Neon Green (Buy action) */
+.btn-primary {
+  background: linear-gradient(135deg, #00E396 0%, #00D68F 100%);
+  color: #0D0D0D;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0, 227, 150, 0.3);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(135deg, #39FF14 0%, #00E396 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(57, 255, 20, 0.4);
+}
+
+/* Secondary CTA - Gold border (Luxury) */
+.btn-secondary {
+  background: transparent;
+  border: 2px solid var(--primary);
+  color: var(--primary);
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 215, 0, 0.1);
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.2);
+}
+
+/* Card styles - Dark Navy with gold border */
+.card-glass {
+  background: rgba(15, 26, 42, 0.8);
+  border: 1px solid rgba(255, 215, 0, 0.15);
+  transition: all 0.2s ease;
+}
+
+.card-glass:hover {
+  border-color: rgba(255, 215, 0, 0.4);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* Profit card - Green glow */
+.profit-card {
+  background: var(--secondary);
+  border: 1px solid rgba(0, 227, 150, 0.3);
+  box-shadow: 0 0 20px rgba(0, 227, 150, 0.1);
+}
+
+/* Glow effects */
+.glow-gold {
+  box-shadow: 0 0 30px rgba(255, 215, 0, 0.3);
+}
+
+.glow-green {
+  box-shadow: 0 0 30px rgba(0, 227, 150, 0.4);
+}
+
+/* Live indicator - Neon green pulse */
+.pulse-live {
+  animation: neonPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes neonPulse {
+  0%, 100% {
+    opacity: 1;
+    box-shadow: 0 0 8px var(--accent);
+  }
+  50% {
+    opacity: 0.7;
+    box-shadow: 0 0 16px var(--accent-bright);
+  }
+}
+
+/* Gold underline for VIP text */
+.gold-underline {
+  position: relative;
+  display: inline-block;
+}
+
+.gold-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #FFD700, transparent);
+}
+
+/* Profit number styling */
+.profit-number {
+  color: var(--accent);
+  text-shadow: 0 0 10px rgba(0, 227, 150, 0.5);
+}
+
+/* Loss number styling */
+.loss-number {
+  color: var(--danger);
+  text-shadow: 0 0 10px rgba(255, 68, 68, 0.5);
+}
+
+/* Testimonial card */
+.testimonial-card {
+  transition: transform 0.2s ease;
+}
+
+.testimonial-card:hover {
+  transform: translateY(-4px);
+}
+
+/* Count animation */
+@keyframes countUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-count {
+  animation: countUp 0.5s ease-out forwards;
+}
+
+/* Rotation utilities for organic feel */
+.rotate-slight-left {
+  transform: rotate(-1deg);
+}
+
+.rotate-slight-right {
+  transform: rotate(1deg);
+}
+
+.rotate-tiny-left {
+  transform: rotate(-0.5deg);
+}
+
+.rotate-tiny-right {
+  transform: rotate(0.5deg);
+}
+
+/* Scrollbar - Dark theme */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--secondary);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary);
+}
+
+/* VIP Badge */
+.vip-badge {
+  background: linear-gradient(135deg, #FFD700 0%, #FFC107 100%);
+  color: #0D0D0D;
+  font-weight: 700;
+  font-size: 0.75rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
