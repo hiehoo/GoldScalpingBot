@@ -70,6 +70,7 @@ export async function fetchCandles(
  */
 export async function getCurrentPrice(symbol: string): Promise<number> {
   if (!twelveData.apiKey) {
+    console.warn(`⚠️ No API key - using mock price for ${symbol}`);
     return getMockPrice(symbol);
   }
 
@@ -79,10 +80,23 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 
   try {
     const response = await fetch(url.toString());
-    const data = await response.json() as { price: string };
-    return parseFloat(data.price);
+    const data = await response.json() as { price?: string; status?: string; message?: string };
+
+    // Check for API error response
+    if (data.status === 'error' || !data.price) {
+      console.error(`Twelve Data price error for ${symbol}:`, data.message || 'No price data');
+      return getMockPrice(symbol);
+    }
+
+    const price = parseFloat(data.price);
+    if (isNaN(price)) {
+      console.error(`Invalid price for ${symbol}: ${data.price}`);
+      return getMockPrice(symbol);
+    }
+
+    return price;
   } catch (error) {
-    console.error('Failed to fetch price:', error);
+    console.error(`Failed to fetch price for ${symbol}:`, error);
     return getMockPrice(symbol);
   }
 }
@@ -109,10 +123,15 @@ function getMockPrice(symbol: string): number {
   const basePrices: Record<string, number> = {
     'XAU/USD': 2650.50,
     'NDX': 21500.00,
+    'QQQ': 520.00,
+    'NAS100': 21500.00,
+    'IXIC': 19800.00,
   };
   const base = basePrices[symbol] || 100;
   // Add some randomness
-  return base + (Math.random() - 0.5) * base * 0.001;
+  const price = base + (Math.random() - 0.5) * base * 0.001;
+  console.log(`📊 Mock price for ${symbol}: ${price.toFixed(2)}`);
+  return price;
 }
 
 function generateMockCandles(symbol: string, count: number): Candle[] {
