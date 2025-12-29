@@ -3,6 +3,46 @@ import type { Candle, MarketData } from '../types/index.js';
 
 const { twelveData } = config;
 
+// Rate limiter: 8 calls per minute for free tier
+const RATE_LIMIT = 8;
+const RATE_WINDOW_MS = 60 * 1000; // 1 minute
+const apiCallTimestamps: number[] = [];
+
+// Cache to reduce API calls
+const priceCache: Map<string, { price: number; timestamp: number }> = new Map();
+const CACHE_TTL_MS = 30 * 1000; // 30 seconds cache
+
+/**
+ * Check if we can make an API call without exceeding rate limit
+ */
+function canMakeApiCall(): boolean {
+  const now = Date.now();
+  // Remove timestamps older than rate window
+  while (apiCallTimestamps.length > 0 && apiCallTimestamps[0] < now - RATE_WINDOW_MS) {
+    apiCallTimestamps.shift();
+  }
+  return apiCallTimestamps.length < RATE_LIMIT;
+}
+
+/**
+ * Wait until we can make an API call
+ */
+async function waitForRateLimit(): Promise<void> {
+  while (!canMakeApiCall()) {
+    const oldestCall = apiCallTimestamps[0];
+    const waitTime = oldestCall + RATE_WINDOW_MS - Date.now() + 100; // +100ms buffer
+    console.log(`⏳ Rate limit: waiting ${Math.ceil(waitTime / 1000)}s...`);
+    await new Promise(resolve => setTimeout(resolve, waitTime));
+  }
+}
+
+/**
+ * Record an API call for rate limiting
+ */
+function recordApiCall(): void {
+  apiCallTimestamps.push(Date.now());
+}
+
 interface TwelveDataCandle {
   datetime: string;
   open: string;
@@ -31,6 +71,9 @@ export async function fetchCandles(
     return generateMockCandles(symbol, outputSize);
   }
 
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
+
   const url = new URL(`${twelveData.baseUrl}/time_series`);
   url.searchParams.set('symbol', symbol);
   url.searchParams.set('interval', interval);
@@ -38,6 +81,8 @@ export async function fetchCandles(
   url.searchParams.set('apikey', twelveData.apiKey);
 
   try {
+    recordApiCall();
+    console.log(`📡 API call: time_series ${symbol} (${apiCallTimestamps.length}/${RATE_LIMIT} in last min)`);
     const response = await fetch(url.toString());
     const data = await response.json() as TwelveDataResponse;
 
@@ -66,7 +111,7 @@ export async function fetchCandles(
 }
 
 /**
- * Get current price for a symbol
+ * Get current price for a symbol (with caching)
  */
 export async function getCurrentPrice(symbol: string): Promise<number> {
   if (!twelveData.apiKey) {
@@ -74,11 +119,23 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
     return getMockPrice(symbol);
   }
 
+  // Check cache first
+  const cached = priceCache.get(symbol);
+  if (cached && Date.now() - cached.timestamp < CACHE_TTL_MS) {
+    console.log(`💾 Using cached price for ${symbol}: ${cached.price.toFixed(2)}`);
+    return cached.price;
+  }
+
+  // Wait for rate limit before making API call
+  await waitForRateLimit();
+
   const url = new URL(`${twelveData.baseUrl}/price`);
   url.searchParams.set('symbol', symbol);
   url.searchParams.set('apikey', twelveData.apiKey);
 
   try {
+    recordApiCall();
+    console.log(`📡 API call: price ${symbol} (${apiCallTimestamps.length}/${RATE_LIMIT} in last min)`);
     const response = await fetch(url.toString());
     const data = await response.json() as { price?: string; status?: string; message?: string };
 
@@ -94,6 +151,8 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
       return getMockPrice(symbol);
     }
 
+    // Cache the price
+    priceCache.set(symbol, { price, timestamp: Date.now() });
     return price;
   } catch (error) {
     console.error(`Failed to fetch price for ${symbol}:`, error);
@@ -102,19 +161,30 @@ export async function getCurrentPrice(symbol: string): Promise<number> {
 }
 
 /**
- * Get full market data for a symbol
+ * Get full market data for a symbol (sequential to respect rate limits)
  */
 export async function getMarketData(symbol: string): Promise<MarketData> {
-  const [candles, currentPrice] = await Promise.all([
-    fetchCandles(symbol),
-    getCurrentPrice(symbol),
-  ]);
+  // Run sequentially to better manage rate limits
+  const candles = await fetchCandles(symbol);
+  const currentPrice = await getCurrentPrice(symbol);
 
   return {
     symbol,
     candles,
     currentPrice,
     timestamp: Date.now(),
+  };
+}
+
+/**
+ * Get API usage stats
+ */
+export function getApiUsageStats(): { callsInLastMinute: number; limit: number } {
+  const now = Date.now();
+  const recentCalls = apiCallTimestamps.filter(t => t > now - RATE_WINDOW_MS);
+  return {
+    callsInLastMinute: recentCalls.length,
+    limit: RATE_LIMIT,
   };
 }
 
@@ -166,4 +236,5 @@ export const marketData = {
   fetchCandles,
   getCurrentPrice,
   getMarketData,
+  getApiUsageStats,
 };
