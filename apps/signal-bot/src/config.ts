@@ -26,9 +26,11 @@ export const config = {
   },
 
   // Trading pairs
+  // Note: NDX requires paid Twelve Data plan
+  // NAS100 uses mock data for MVP (QQQ price scale doesn't match CFD)
   symbols: {
     gold: 'XAU/USD',
-    nas100: 'NDX',
+    nas100: 'NAS100_MOCK',  // Use mock data - real NAS100 CFD ~21,500 vs QQQ ~520
   },
 
   // Signal settings

@@ -81,7 +81,7 @@ function calculateLevels(
   direction: SignalDirection,
   symbol: string
 ): { stopLoss: number; takeProfit1: number; takeProfit2: number; takeProfit3: number } {
-  const isGold = symbol === symbols.gold;
+  const isGold = symbol === symbols.gold || symbol === 'XAU/USD';
   const stopLossPips = isGold
     ? signalConfig.defaultStopLossPips.gold
     : signalConfig.defaultStopLossPips.nas100;
@@ -182,7 +182,9 @@ export async function generateAllSignals(): Promise<TradingSignal[]> {
 export function formatSignalMessage(signal: TradingSignal): string {
   const emoji = signal.direction === 'BUY' ? '🟢' : '🔴';
   const directionText = signal.direction === 'BUY' ? 'BUY' : 'SELL';
-  const symbolDisplay = signal.symbol === 'XAU/USD' ? '🥇 GOLD (XAUUSD)' : '📊 NAS100';
+  // Display clean symbol names (NAS100_MOCK -> NAS100)
+  const isGold = signal.symbol === 'XAU/USD';
+  const symbolDisplay = isGold ? '🥇 GOLD (XAUUSD)' : '📊 NAS100';
 
   return `
 ${emoji} *${directionText} SIGNAL* ${emoji}

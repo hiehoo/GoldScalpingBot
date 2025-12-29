@@ -66,6 +66,12 @@ export async function fetchCandles(
   interval: string = '1h',
   outputSize: number = 100
 ): Promise<Candle[]> {
+  // Use mock data for NAS100 (Twelve Data requires paid plan for NDX)
+  if (symbol === 'NAS100_MOCK' || symbol.includes('MOCK')) {
+    console.log(`📊 Using mock data for ${symbol} (paid API required for real data)`);
+    return generateMockCandles(symbol, outputSize);
+  }
+
   if (!twelveData.apiKey) {
     console.warn('⚠️ Twelve Data API key not set - using mock data');
     return generateMockCandles(symbol, outputSize);
@@ -114,6 +120,11 @@ export async function fetchCandles(
  * Get current price for a symbol (with caching)
  */
 export async function getCurrentPrice(symbol: string): Promise<number> {
+  // Use mock data for NAS100 (Twelve Data requires paid plan for NDX)
+  if (symbol === 'NAS100_MOCK' || symbol.includes('MOCK')) {
+    return getMockPrice(symbol);
+  }
+
   if (!twelveData.apiKey) {
     console.warn(`⚠️ No API key - using mock price for ${symbol}`);
     return getMockPrice(symbol);
@@ -195,11 +206,12 @@ function getMockPrice(symbol: string): number {
     'NDX': 21500.00,
     'QQQ': 520.00,
     'NAS100': 21500.00,
+    'NAS100_MOCK': 21450.00,  // Realistic NAS100 CFD price
     'IXIC': 19800.00,
   };
   const base = basePrices[symbol] || 100;
-  // Add some randomness
-  const price = base + (Math.random() - 0.5) * base * 0.001;
+  // Add some randomness (0.1% variation)
+  const price = base + (Math.random() - 0.5) * base * 0.002;
   console.log(`📊 Mock price for ${symbol}: ${price.toFixed(2)}`);
   return price;
 }
