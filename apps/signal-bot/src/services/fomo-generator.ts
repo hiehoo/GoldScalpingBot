@@ -1,307 +1,423 @@
 import { createCanvas, type SKRSContext2D } from '@napi-rs/canvas';
 import type { FomoPost, SignalDirection } from '../types/index.js';
-import { config } from '../config.js';
 
-// MT5 Mobile dark theme colors
-const MT5_COLORS = {
-  background: '#1C1C1E',
-  cardBg: '#2C2C2E',
-  text: '#FFFFFF',
-  textSecondary: '#8E8E93',
-  profit: '#34C759',
-  loss: '#FF3B30',
-  gold: '#FFD700',
-  border: '#3A3A3C',
+// MT5 Mobile exact colors from screenshot
+const COLORS = {
+  background: '#000000',     // Pure black
+  text: '#FFFFFF',           // White
+  textSecondary: '#8E8E93',  // Gray
+  sell: '#FF4444',           // Red for sell
+  buy: '#4A90D9',            // Blue for buy
+  profit: '#4CAF50',         // Green for profit
+  loss: '#FF4444',           // Red for loss
+  tabBg: '#2C2C2E',          // Tab background
+  tabSelected: '#3A3A3C',    // Selected tab
+  separator: '#333333',      // Line separator
+  navIcon: '#8E8E93',        // Navigation icons
+  navSelected: '#4A90D9',    // Selected nav (History)
 };
 
-interface FomoConfig {
-  width: number;
-  height: number;
+// Canvas dimensions (mobile-like aspect ratio)
+const WIDTH = 390;
+const HEIGHT = 844;
+
+interface TradeRow {
+  symbol: string;
+  direction: 'buy' | 'sell';
+  lotSize: number;
+  openPrice: number;
+  closePrice: number;
+  date: string;
+  time: string;
+  pnl: number;
 }
 
-const DEFAULT_CONFIG: FomoConfig = {
-  width: 400,
-  height: 520,
-};
-
-/**
- * Generate random ZAR profit amount (R500 - R8500)
- */
-function generateRandomProfit(): number {
-  const min = 500;
-  const max = 8500;
-  return Math.floor(Math.random() * (max - min + 1) + min);
-}
-
-/**
- * Generate random pips (15 - 150)
- */
-function generateRandomPips(): number {
-  const min = 15;
-  const max = 150;
-  return Math.floor(Math.random() * (max - min + 1) + min);
+interface AccountSummary {
+  deposit: number;
+  withdrawal: number;
+  profit: number;
+  swap: number;
+  commission: number;
+  balance: number;
 }
 
 /**
- * Generate random trade duration
+ * Generate random trade history for FOMO
  */
-function generateRandomDuration(): string {
-  const hours = Math.floor(Math.random() * 6);
-  const minutes = Math.floor(Math.random() * 60);
+function generateTradeHistory(): TradeRow[] {
+  const trades: TradeRow[] = [];
+  const basePrice = 2620 + Math.random() * 60; // Gold around 2620-2680
 
-  if (hours === 0) {
-    return `${minutes}m`;
+  // Generate 10-12 trades
+  const numTrades = 10 + Math.floor(Math.random() * 3);
+  const now = new Date();
+
+  for (let i = 0; i < numTrades; i++) {
+    const direction = Math.random() > 0.5 ? 'buy' : 'sell';
+    const lotSize = [0.1, 0.2, 0.3, 0.5, 0.7, 1.0][Math.floor(Math.random() * 6)];
+    const priceMove = (Math.random() - 0.3) * 15; // Slight bias towards profit
+    const openPrice = basePrice + (Math.random() - 0.5) * 30;
+    const closePrice = direction === 'buy'
+      ? openPrice + priceMove
+      : openPrice - priceMove;
+
+    // Calculate PnL (simplified: $100 per pip per lot for gold)
+    const pips = Math.abs(closePrice - openPrice);
+    const isWin = (direction === 'buy' && closePrice > openPrice) ||
+                  (direction === 'sell' && closePrice < openPrice);
+    const pnl = isWin
+      ? pips * lotSize * 100
+      : -pips * lotSize * 100;
+
+    // Generate date (last few days)
+    const tradeDate = new Date(now);
+    tradeDate.setDate(tradeDate.getDate() - Math.floor(i / 3));
+    tradeDate.setHours(Math.floor(Math.random() * 24));
+    tradeDate.setMinutes(Math.floor(Math.random() * 60));
+
+    trades.push({
+      symbol: 'XAUUSD',
+      direction,
+      lotSize,
+      openPrice: Math.round(openPrice * 100) / 100,
+      closePrice: Math.round(closePrice * 100) / 100,
+      date: tradeDate.toISOString().slice(0, 10).replace(/-/g, '.'),
+      time: tradeDate.toTimeString().slice(0, 8),
+      pnl: Math.round(pnl * 100) / 100,
+    });
   }
-  return `${hours}h ${minutes}m`;
+
+  return trades;
+}
+
+/**
+ * Generate account summary based on trades
+ */
+function generateAccountSummary(trades: TradeRow[]): AccountSummary {
+  const totalProfit = trades.reduce((sum, t) => sum + t.pnl, 0);
+  const deposit = 5000 + Math.floor(Math.random() * 3000);
+  const withdrawal = Math.floor(Math.random() * 500);
+  const swap = Math.round((Math.random() * 50) * 100) / 100;
+
+  return {
+    deposit,
+    withdrawal: -withdrawal,
+    profit: Math.round(totalProfit * 100) / 100,
+    swap,
+    commission: 0,
+    balance: Math.round((deposit - withdrawal + totalProfit + swap) * 100) / 100,
+  };
+}
+
+/**
+ * Format number with space as thousand separator (like MT5)
+ */
+function formatNumber(num: number, decimals = 2): string {
+  const fixed = Math.abs(num).toFixed(decimals);
+  const parts = fixed.split('.');
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  const result = parts.join('.');
+  return num < 0 ? `-${result}` : result;
+}
+
+/**
+ * Draw status bar (time, signal, battery)
+ */
+function drawStatusBar(ctx: SKRSContext2D) {
+  ctx.fillStyle = COLORS.text;
+  ctx.font = '600 17px Roboto, sans-serif';
+  ctx.textAlign = 'left';
+
+  // Time
+  const time = new Date().toLocaleTimeString('en-ZA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+    timeZone: 'Africa/Johannesburg',
+  });
+  ctx.fillText(time, 28, 52);
+
+  // Right side icons (simplified)
+  ctx.textAlign = 'right';
+  ctx.font = '15px Roboto, sans-serif';
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText('5G', WIDTH - 70, 52);
+
+  // Signal bars (simplified)
+  ctx.fillStyle = COLORS.text;
+  for (let i = 0; i < 4; i++) {
+    const barHeight = 6 + i * 3;
+    ctx.fillRect(WIDTH - 55 + i * 5, 52 - barHeight, 3, barHeight);
+  }
+
+  // Battery outline
+  ctx.strokeStyle = COLORS.text;
+  ctx.lineWidth = 1;
+  ctx.strokeRect(WIDTH - 32, 40, 22, 11);
+  ctx.fillRect(WIDTH - 10, 43, 2, 5);
+  // Battery fill
+  ctx.fillStyle = COLORS.text;
+  ctx.fillRect(WIDTH - 30, 42, 16, 7);
+}
+
+/**
+ * Draw tab navigation (Positions | Orders | Deals)
+ */
+function drawTabNavigation(ctx: SKRSContext2D) {
+  const tabY = 75;
+  const tabHeight = 36;
+
+  // Tab background
+  ctx.fillStyle = COLORS.tabBg;
+  ctx.beginPath();
+  ctx.roundRect(80, tabY, 230, tabHeight, 8);
+  ctx.fill();
+
+  // Tabs
+  const tabs = ['Positions', 'Orders', 'Deals'];
+  const tabWidth = 230 / 3;
+
+  tabs.forEach((tab, i) => {
+    const x = 80 + i * tabWidth;
+
+    // Selected state for "Positions"
+    if (i === 0) {
+      ctx.fillStyle = COLORS.tabSelected;
+      ctx.beginPath();
+      ctx.roundRect(x + 2, tabY + 2, tabWidth - 4, tabHeight - 4, 6);
+      ctx.fill();
+      ctx.fillStyle = COLORS.text;
+    } else {
+      ctx.fillStyle = COLORS.textSecondary;
+    }
+
+    ctx.font = '14px Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(tab, x + tabWidth / 2, tabY + 23);
+  });
+
+  // Filter icon (left)
+  ctx.fillStyle = COLORS.textSecondary;
+  ctx.font = '18px Roboto, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillText('≡', 35, tabY + 24);
+
+  // Clock icon (right)
+  ctx.beginPath();
+  ctx.arc(WIDTH - 35, tabY + 18, 10, 0, Math.PI * 2);
+  ctx.strokeStyle = COLORS.textSecondary;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(WIDTH - 35, tabY + 12);
+  ctx.lineTo(WIDTH - 35, tabY + 18);
+  ctx.lineTo(WIDTH - 30, tabY + 18);
+  ctx.stroke();
+}
+
+/**
+ * Draw trade row
+ */
+function drawTradeRow(ctx: SKRSContext2D, trade: TradeRow, y: number) {
+  const leftPadding = 15;
+  const rightPadding = WIDTH - 15;
+
+  // Left red indicator line for trades
+  ctx.fillStyle = COLORS.sell;
+  ctx.fillRect(0, y, 3, 60);
+
+  // Symbol + direction + lot
+  ctx.font = 'bold 16px Roboto, sans-serif';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = COLORS.text;
+  ctx.fillText(trade.symbol, leftPadding, y + 22);
+
+  ctx.fillStyle = trade.direction === 'buy' ? COLORS.buy : COLORS.sell;
+  ctx.font = '16px Roboto, sans-serif';
+  ctx.fillText(` ${trade.direction} ${trade.lotSize.toFixed(trade.lotSize < 1 ? 2 : 1)}`, leftPadding + 65, y + 22);
+
+  // Price range and date
+  ctx.fillStyle = COLORS.textSecondary;
+  ctx.font = '14px Roboto, sans-serif';
+  ctx.fillText(`${trade.openPrice.toFixed(2)} → ${trade.closePrice.toFixed(2)}`, leftPadding, y + 45);
+
+  // Date and time
+  ctx.textAlign = 'right';
+  ctx.fillText(`${trade.date} ${trade.time}`, rightPadding - 80, y + 45);
+
+  // PnL
+  ctx.fillStyle = trade.pnl >= 0 ? COLORS.profit : COLORS.loss;
+  ctx.font = 'bold 16px Roboto, sans-serif';
+  ctx.fillText(formatNumber(trade.pnl), rightPadding, y + 22);
+}
+
+/**
+ * Draw account summary section
+ */
+function drawAccountSummary(ctx: SKRSContext2D, summary: AccountSummary, y: number) {
+  const leftPadding = 15;
+  const rightPadding = WIDTH - 15;
+  const lineHeight = 28;
+
+  // Separator line
+  ctx.strokeStyle = COLORS.separator;
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, y);
+  ctx.lineTo(WIDTH, y);
+  ctx.stroke();
+
+  const items = [
+    { label: 'Deposit', value: summary.deposit, color: COLORS.text },
+    { label: 'Withdrawal', value: summary.withdrawal, color: COLORS.text },
+    { label: 'Profit', value: summary.profit, color: COLORS.text },
+    { label: 'Swap', value: summary.swap, color: COLORS.text },
+    { label: 'Commission', value: summary.commission, color: COLORS.text },
+    { label: 'Balance', value: summary.balance, color: COLORS.text },
+  ];
+
+  items.forEach((item, i) => {
+    const itemY = y + 25 + i * lineHeight;
+
+    ctx.fillStyle = COLORS.text;
+    ctx.font = '15px Roboto, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(item.label, leftPadding, itemY);
+
+    ctx.textAlign = 'right';
+    ctx.fillText(formatNumber(item.value), rightPadding, itemY);
+  });
+}
+
+/**
+ * Draw bottom navigation bar
+ */
+function drawBottomNav(ctx: SKRSContext2D) {
+  const navY = HEIGHT - 80;
+
+  // Background
+  ctx.fillStyle = '#000000';
+  ctx.fillRect(0, navY, WIDTH, 80);
+
+  // Separator
+  ctx.strokeStyle = COLORS.separator;
+  ctx.lineWidth = 0.5;
+  ctx.beginPath();
+  ctx.moveTo(0, navY);
+  ctx.lineTo(WIDTH, navY);
+  ctx.stroke();
+
+  const navItems = [
+    { icon: '↕', label: 'Quotes', selected: false },
+    { icon: '📊', label: 'Chart', selected: false },
+    { icon: '📈', label: 'Trade', selected: false },
+    { icon: '🕐', label: 'History', selected: true },
+    { icon: '⚙', label: 'Settings', selected: false },
+  ];
+
+  const itemWidth = WIDTH / navItems.length;
+
+  navItems.forEach((item, i) => {
+    const x = i * itemWidth + itemWidth / 2;
+
+    ctx.fillStyle = item.selected ? COLORS.navSelected : COLORS.navIcon;
+
+    // Icon
+    ctx.font = '22px Roboto, sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(item.icon, x, navY + 30);
+
+    // Label
+    ctx.font = '10px Roboto, sans-serif';
+    ctx.fillText(item.label, x, navY + 50);
+  });
+
+  // Home indicator
+  ctx.fillStyle = COLORS.text;
+  ctx.beginPath();
+  ctx.roundRect(WIDTH / 2 - 70, HEIGHT - 8, 140, 5, 3);
+  ctx.fill();
 }
 
 /**
  * Generate FOMO post data
  */
 export function generateFomoData(): FomoPost {
-  const symbols = ['XAU/USD', 'NAS100'];
   const directions: SignalDirection[] = ['BUY', 'SELL'];
+  const trades = generateTradeHistory();
+  const summary = generateAccountSummary(trades);
+
+  // Calculate total profit from winning trades
+  const profit = Math.max(
+    trades.filter(t => t.pnl > 0).reduce((sum, t) => sum + t.pnl, 0),
+    500
+  );
 
   return {
     id: `fomo-${Date.now()}`,
-    profit: generateRandomProfit(),
-    pips: generateRandomPips(),
-    symbol: symbols[Math.floor(Math.random() * symbols.length)],
+    profit: Math.round(profit),
+    pips: Math.floor(profit / 50), // Rough conversion
+    symbol: 'XAU/USD',
     direction: directions[Math.floor(Math.random() * directions.length)],
-    duration: generateRandomDuration(),
+    duration: `${Math.floor(Math.random() * 4) + 1}h ${Math.floor(Math.random() * 60)}m`,
     timestamp: new Date(),
   };
 }
 
 /**
- * Render MT5-style profit screenshot
+ * Render MT5-style history screenshot (matching exact design)
  */
-export async function renderFomoScreenshot(post: FomoPost): Promise<Buffer> {
-  const cfg = DEFAULT_CONFIG;
-  const canvas = createCanvas(cfg.width, cfg.height);
+export async function renderFomoScreenshot(_post: FomoPost): Promise<Buffer> {
+  const canvas = createCanvas(WIDTH, HEIGHT);
   const ctx = canvas.getContext('2d');
 
   // Background
-  ctx.fillStyle = MT5_COLORS.background;
-  ctx.fillRect(0, 0, cfg.width, cfg.height);
+  ctx.fillStyle = COLORS.background;
+  ctx.fillRect(0, 0, WIDTH, HEIGHT);
 
-  // Status bar (fake)
-  drawStatusBar(ctx, cfg);
+  // Generate data
+  const trades = generateTradeHistory();
+  const summary = generateAccountSummary(trades);
 
-  // MT5 header
-  drawMT5Header(ctx, cfg);
+  // Draw components
+  drawStatusBar(ctx);
+  drawTabNavigation(ctx);
 
-  // Trade card
-  drawTradeCard(ctx, cfg, post);
+  // Draw trade rows (limit to fit summary section)
+  let currentY = 125;
+  const maxTrades = Math.min(trades.length, 7); // Fit 7 trades + summary
 
-  // Account summary
-  drawAccountSummary(ctx, cfg, post);
+  for (let i = 0; i < maxTrades; i++) {
+    drawTradeRow(ctx, trades[i], currentY);
+    currentY += 55;
+  }
 
-  // Branding watermark
-  drawWatermark(ctx, cfg);
+  // Draw account summary
+  drawAccountSummary(ctx, summary, currentY + 5);
+
+  // Draw bottom navigation
+  drawBottomNav(ctx);
 
   return canvas.toBuffer('image/png');
-}
-
-function drawStatusBar(ctx: SKRSContext2D, cfg: FomoConfig) {
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '12px -apple-system, BlinkMacSystemFont, sans-serif';
-
-  // Time
-  const time = new Date().toLocaleTimeString('en-ZA', {
-    hour: '2-digit',
-    minute: '2-digit',
-    timeZone: 'Africa/Johannesburg',
-  });
-  ctx.textAlign = 'left';
-  ctx.fillText(time, 15, 20);
-
-  // Network + Battery icons (simplified)
-  ctx.textAlign = 'right';
-  ctx.fillText('📶 🔋 92%', cfg.width - 15, 20);
-}
-
-function drawMT5Header(ctx: SKRSContext2D, cfg: FomoConfig) {
-  // Header background
-  ctx.fillStyle = MT5_COLORS.cardBg;
-  ctx.fillRect(0, 35, cfg.width, 50);
-
-  // MT5 logo area
-  ctx.fillStyle = '#FF6B00'; // MetaTrader orange
-  ctx.font = 'bold 16px -apple-system, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('MetaTrader 5', 15, 65);
-
-  // Account label
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '12px -apple-system, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('Real Account', cfg.width - 15, 65);
-}
-
-function drawTradeCard(ctx: SKRSContext2D, cfg: FomoConfig, post: FomoPost) {
-  const cardY = 100;
-  const cardHeight = 200;
-
-  // Card background
-  ctx.fillStyle = MT5_COLORS.cardBg;
-  roundRect(ctx, 15, cardY, cfg.width - 30, cardHeight, 12);
-  ctx.fill();
-
-  // Symbol and direction
-  const symbolEmoji = post.symbol === 'XAU/USD' ? '🥇' : '📊';
-  const directionColor = post.direction === 'BUY' ? MT5_COLORS.profit : MT5_COLORS.loss;
-
-  ctx.fillStyle = MT5_COLORS.text;
-  ctx.font = 'bold 20px -apple-system, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText(`${symbolEmoji} ${post.symbol}`, 30, cardY + 35);
-
-  // Direction badge
-  ctx.fillStyle = directionColor;
-  ctx.font = 'bold 14px -apple-system, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText(post.direction, cfg.width - 30, cardY + 35);
-
-  // Separator line
-  ctx.strokeStyle = MT5_COLORS.border;
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(30, cardY + 55);
-  ctx.lineTo(cfg.width - 30, cardY + 55);
-  ctx.stroke();
-
-  // Profit amount (big)
-  ctx.fillStyle = MT5_COLORS.profit;
-  ctx.font = 'bold 42px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText(`+R${post.profit.toLocaleString()}`, cfg.width / 2, cardY + 110);
-
-  // Pips
-  ctx.fillStyle = MT5_COLORS.profit;
-  ctx.font = '18px -apple-system, sans-serif';
-  ctx.fillText(`+${post.pips} pips`, cfg.width / 2, cardY + 140);
-
-  // Trade info row
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '13px -apple-system, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('Duration:', 30, cardY + 175);
-  ctx.fillStyle = MT5_COLORS.text;
-  ctx.fillText(post.duration, 100, cardY + 175);
-
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.textAlign = 'right';
-  ctx.fillText('Closed', cfg.width - 30, cardY + 175);
-}
-
-function drawAccountSummary(ctx: SKRSContext2D, cfg: FomoConfig, post: FomoPost) {
-  const summaryY = 320;
-
-  // Summary card
-  ctx.fillStyle = MT5_COLORS.cardBg;
-  roundRect(ctx, 15, summaryY, cfg.width - 30, 130, 12);
-  ctx.fill();
-
-  // Today's profit
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '13px -apple-system, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText("Today's Profit", 30, summaryY + 30);
-
-  const todayProfit = post.profit + Math.floor(Math.random() * 3000);
-  ctx.fillStyle = MT5_COLORS.profit;
-  ctx.font = 'bold 24px -apple-system, sans-serif';
-  ctx.fillText(`+R${todayProfit.toLocaleString()}`, 30, summaryY + 60);
-
-  // Win rate
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '13px -apple-system, sans-serif';
-  ctx.textAlign = 'right';
-  ctx.fillText('Win Rate', cfg.width - 30, summaryY + 30);
-
-  const winRate = 75 + Math.floor(Math.random() * 15);
-  ctx.fillStyle = MT5_COLORS.profit;
-  ctx.font = 'bold 24px -apple-system, sans-serif';
-  ctx.fillText(`${winRate}%`, cfg.width - 30, summaryY + 60);
-
-  // Separator
-  ctx.strokeStyle = MT5_COLORS.border;
-  ctx.beginPath();
-  ctx.moveTo(30, summaryY + 80);
-  ctx.lineTo(cfg.width - 30, summaryY + 80);
-  ctx.stroke();
-
-  // This week stats
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '12px -apple-system, sans-serif';
-  ctx.textAlign = 'left';
-  ctx.fillText('This Week:', 30, summaryY + 105);
-
-  const weekProfit = todayProfit * (3 + Math.floor(Math.random() * 4));
-  ctx.fillStyle = MT5_COLORS.profit;
-  ctx.font = 'bold 14px -apple-system, sans-serif';
-  ctx.fillText(`+R${weekProfit.toLocaleString()}`, 110, summaryY + 105);
-
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '12px -apple-system, sans-serif';
-  ctx.textAlign = 'right';
-  const trades = 8 + Math.floor(Math.random() * 12);
-  ctx.fillText(`${trades} trades`, cfg.width - 30, summaryY + 105);
-}
-
-function drawWatermark(ctx: SKRSContext2D, cfg: FomoConfig) {
-  ctx.fillStyle = MT5_COLORS.gold;
-  ctx.font = 'bold 14px -apple-system, sans-serif';
-  ctx.textAlign = 'center';
-  ctx.fillText('🇿🇦 Mzansi FX VIP', cfg.width / 2, cfg.height - 25);
-
-  ctx.fillStyle = MT5_COLORS.textSecondary;
-  ctx.font = '11px -apple-system, sans-serif';
-  ctx.fillText('Join @MzansiFxVIP for FREE signals', cfg.width / 2, cfg.height - 8);
-}
-
-function roundRect(
-  ctx: SKRSContext2D,
-  x: number,
-  y: number,
-  width: number,
-  height: number,
-  radius: number
-) {
-  ctx.beginPath();
-  ctx.moveTo(x + radius, y);
-  ctx.lineTo(x + width - radius, y);
-  ctx.quadraticCurveTo(x + width, y, x + width, y + radius);
-  ctx.lineTo(x + width, y + height - radius);
-  ctx.quadraticCurveTo(x + width, y + height, x + width - radius, y + height);
-  ctx.lineTo(x + radius, y + height);
-  ctx.quadraticCurveTo(x, y + height, x, y + height - radius);
-  ctx.lineTo(x, y + radius);
-  ctx.quadraticCurveTo(x, y, x + radius, y);
-  ctx.closePath();
 }
 
 /**
  * Format FOMO post caption for Telegram
  */
 export function formatFomoCaption(post: FomoPost): string {
-  const symbolEmoji = post.symbol === 'XAU/USD' ? '🥇' : '📊';
-  const directionEmoji = post.direction === 'BUY' ? '🟢' : '🔴';
-
   return `
-💰 *ANOTHER WIN!* 💰
+💰 *LOOK AT THESE RESULTS!* 💰
 
-${directionEmoji} ${post.direction} ${symbolEmoji} ${post.symbol}
+🥇 *GOLD (XAUUSD)* Trades
 ━━━━━━━━━━━━━━━━━━━━
 
-✅ *+R${post.profit.toLocaleString()}* profit
-📈 *+${post.pips} pips* in ${post.duration}
+✅ *+R${post.profit.toLocaleString()}* profit today!
+📈 Multiple winning trades
 
 ━━━━━━━━━━━━━━━━━━━━
 
-🔥 *Join us and stop missing out!*
-👉 Click the link in bio
+🔥 *Stop watching from the sidelines!*
+👉 Join @MzansiFxVIP for FREE signals
 
 🇿🇦 *Mzansi FX VIP* - We eat, you eat!
 `.trim();
