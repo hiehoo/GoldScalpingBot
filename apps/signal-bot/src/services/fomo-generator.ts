@@ -1,5 +1,10 @@
-import { createCanvas, type SKRSContext2D } from '@napi-rs/canvas';
+import { createCanvas, type SKRSContext2D, GlobalFonts } from '@napi-rs/canvas';
 import type { FomoPost, SignalDirection } from '../types/index.js';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Use system fonts that are available
+const FONT_FAMILY = 'Arial, Helvetica Neue, sans-serif';
 
 // MT5 Mobile exact colors from screenshot
 const COLORS = {
@@ -125,7 +130,7 @@ function formatNumber(num: number, decimals = 2): string {
  */
 function drawStatusBar(ctx: SKRSContext2D) {
   ctx.fillStyle = COLORS.text;
-  ctx.font = '600 17px Roboto, sans-serif';
+  ctx.font = `bold 17px ${FONT_FAMILY}`;
   ctx.textAlign = 'left';
 
   // Time
@@ -139,7 +144,7 @@ function drawStatusBar(ctx: SKRSContext2D) {
 
   // Right side icons (simplified)
   ctx.textAlign = 'right';
-  ctx.font = '15px Roboto, sans-serif';
+  ctx.font = `15px ${FONT_FAMILY}`;
   ctx.fillStyle = COLORS.text;
   ctx.fillText('5G', WIDTH - 70, 52);
 
@@ -191,14 +196,14 @@ function drawTabNavigation(ctx: SKRSContext2D) {
       ctx.fillStyle = COLORS.textSecondary;
     }
 
-    ctx.font = '14px Roboto, sans-serif';
+    ctx.font = `14px ${FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.fillText(tab, x + tabWidth / 2, tabY + 23);
   });
 
   // Filter icon (left)
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = '18px Roboto, sans-serif';
+  ctx.font = `18px ${FONT_FAMILY}`;
   ctx.textAlign = 'center';
   ctx.fillText('≡', 35, tabY + 24);
 
@@ -227,18 +232,18 @@ function drawTradeRow(ctx: SKRSContext2D, trade: TradeRow, y: number) {
   ctx.fillRect(0, y, 3, 60);
 
   // Symbol + direction + lot
-  ctx.font = 'bold 16px Roboto, sans-serif';
+  ctx.font = `bold 16px ${FONT_FAMILY}`;
   ctx.textAlign = 'left';
   ctx.fillStyle = COLORS.text;
   ctx.fillText(trade.symbol, leftPadding, y + 22);
 
   ctx.fillStyle = trade.direction === 'buy' ? COLORS.buy : COLORS.sell;
-  ctx.font = '16px Roboto, sans-serif';
+  ctx.font = `16px ${FONT_FAMILY}`;
   ctx.fillText(` ${trade.direction} ${trade.lotSize.toFixed(trade.lotSize < 1 ? 2 : 1)}`, leftPadding + 65, y + 22);
 
   // Price range and date
   ctx.fillStyle = COLORS.textSecondary;
-  ctx.font = '14px Roboto, sans-serif';
+  ctx.font = `14px ${FONT_FAMILY}`;
   ctx.fillText(`${trade.openPrice.toFixed(2)} → ${trade.closePrice.toFixed(2)}`, leftPadding, y + 45);
 
   // Date and time
@@ -247,7 +252,7 @@ function drawTradeRow(ctx: SKRSContext2D, trade: TradeRow, y: number) {
 
   // PnL
   ctx.fillStyle = trade.pnl >= 0 ? COLORS.profit : COLORS.loss;
-  ctx.font = 'bold 16px Roboto, sans-serif';
+  ctx.font = `bold 16px ${FONT_FAMILY}`;
   ctx.fillText(formatNumber(trade.pnl), rightPadding, y + 22);
 }
 
@@ -280,7 +285,7 @@ function drawAccountSummary(ctx: SKRSContext2D, summary: AccountSummary, y: numb
     const itemY = y + 25 + i * lineHeight;
 
     ctx.fillStyle = COLORS.text;
-    ctx.font = '15px Roboto, sans-serif';
+    ctx.font = `15px ${FONT_FAMILY}`;
     ctx.textAlign = 'left';
     ctx.fillText(item.label, leftPadding, itemY);
 
@@ -323,12 +328,12 @@ function drawBottomNav(ctx: SKRSContext2D) {
     ctx.fillStyle = item.selected ? COLORS.navSelected : COLORS.navIcon;
 
     // Icon
-    ctx.font = '22px Roboto, sans-serif';
+    ctx.font = `22px ${FONT_FAMILY}`;
     ctx.textAlign = 'center';
     ctx.fillText(item.icon, x, navY + 30);
 
     // Label
-    ctx.font = '10px Roboto, sans-serif';
+    ctx.font = `10px ${FONT_FAMILY}`;
     ctx.fillText(item.label, x, navY + 50);
   });
 
