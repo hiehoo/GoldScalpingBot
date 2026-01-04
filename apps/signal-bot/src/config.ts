@@ -43,13 +43,16 @@ export const config = {
   },
 
   // Scheduler settings (cron expressions)
+  // All times aligned to SAST (South African Standard Time = UTC+2)
   schedulers: {
-    signals: '0 */4 * * *', // Every 4 hours at :00 (0, 4, 8, 12, 16, 20)
+    // 4H signals at round hours SAST: 12AM, 4AM, 8AM, 12PM, 4PM, 8PM
+    // UTC equivalents: 22:00, 02:00, 06:00, 10:00, 14:00, 18:00
+    signals: '0 2,6,10,14,18,22 * * *',
     priceTracker: '*/15 * * * *', // Every 15 minutes for TP/SL checks
-    signalReview: '5 */4 * * *', // 5 min after signal gen for cleanup
-    dailyRecap: '0 20 * * *', // 8 PM daily (SAST)
-    weeklyRecap: '0 20 * * 0', // Sunday 8 PM (SAST)
-    // FOMO scheduler removed - no longer generating FOMO posts
+    // Signal review runs 5 min after each signal time
+    signalReview: '5 2,6,10,14,18,22 * * *',
+    dailyRecap: '0 18 * * *', // 8 PM SAST = 18:00 UTC
+    weeklyRecap: '0 18 * * 0', // Sunday 8 PM SAST = 18:00 UTC
   },
 
   // Affiliate
