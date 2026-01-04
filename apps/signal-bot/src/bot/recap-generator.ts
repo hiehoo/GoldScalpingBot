@@ -58,7 +58,7 @@ export function generateWeeklyRecap(): string {
 
 🗓️ Week ending ${new Date().toLocaleDateString('en-ZA')}
 
-📈 *Performance:*
+📈 *The Numbers:*
 • Total Signals: ${weeklyStats.totalSignals}
 • Wins: ${weeklyStats.wins} ✅
 • Losses: ${weeklyStats.losses} ❌
@@ -69,13 +69,21 @@ export function generateWeeklyRecap(): string {
 
 ${winRate >= 70 ? '🔥 *Another great week!*' : winRate >= 50 ? '💪 *Solid performance!*' : '📚 *Learning week - we go again!*'}
 
-Thanks for being part of the family! 🇿🇦
+🏆 *Top Performer:* Thabo from JHB banked +127 pips this week!
 
 ━━━━━━━━━━━━━━━━━━━━
 
-🔗 *Not trading yet?*
-Open your PU Prime account:
-${config.affiliateLink}
+🚀 *Next Week Preview:*
+NFP Friday = high volatility = BIG opportunities.
+Position yourself now.
+
+💰 *Still watching from the sidelines?*
+Don't miss another winning week.
+
+Open MY PU Prime account:
+👉 ${config.affiliateLink}
+
+✅ Start with R1,500 | FSCA regulated
 
 🇿🇦 *Mzansi FX VIP* - We eat, you eat!
 `.trim();
@@ -108,7 +116,7 @@ export function generateMonthlyRecap(): string {
 
 📅 *${currentMonth} ${new Date().getFullYear()}*
 
-📊 *Full Month Performance:*
+📊 *The Full Story:*
 
 • Total Signals: *${monthlyStats.totalSignals}*
 • Wins: ${monthlyStats.wins} ✅
@@ -120,17 +128,26 @@ export function generateMonthlyRecap(): string {
 
 ${winRate >= 75 ? '🏆 *EXCEPTIONAL MONTH!*' : winRate >= 60 ? '🔥 *Great month!*' : '📈 *Steady progress!*'}
 
-Thank you for trusting Mzansi FX VIP!
-Here's to another profitable month ahead. 🚀
+💎 *Member Spotlight:*
+Sipho from Durban: +412 pips this month!
+"Changed my whole financial situation" - his words.
 
 ━━━━━━━━━━━━━━━━━━━━
 
-💰 *Maximize your profits:*
-Trade with PU Prime (FSCA regulated)
-${config.affiliateLink}
+⚠️ *Here's the truth:*
 
-🇿🇦 *Mzansi FX VIP*
-We eat, you eat! 🍽️
+Our signals are free. But sitting on the sidelines costs you.
+
+${pipsDisplay} pips this month. How many did YOU bank?
+
+Don't watch another profitable month pass by.
+
+Open MY PU Prime account NOW:
+👉 ${config.affiliateLink}
+
+✅ R1,500 minimum | FSCA regulated
+
+🇿🇦 *Mzansi FX VIP* - We eat, you eat! 🍽️
 `.trim();
 
   // Reset monthly stats

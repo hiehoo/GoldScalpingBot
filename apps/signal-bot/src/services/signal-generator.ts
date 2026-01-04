@@ -187,12 +187,13 @@ export function formatSignalMessage(signal: TradingSignal): string {
   const symbolDisplay = isGold ? '🥇 GOLD (XAUUSD)' : '📊 NAS100';
 
   return `
-${emoji} *${directionText} SIGNAL* ${emoji}
+🚨 *LIVE SIGNAL - ENTRY WINDOW CLOSING* 🚨
+${emoji} *${directionText}* ${emoji}
 ━━━━━━━━━━━━━━━━━━━━
 
 ${symbolDisplay}
 
-📍 *Entry:* ${signal.entryPrice.toFixed(2)}
+📍 *Entry NOW:* ${signal.entryPrice.toFixed(2)}
 🛑 *Stop Loss:* ${signal.stopLoss.toFixed(2)}
 
 🎯 *Take Profit 1:* ${signal.takeProfit1.toFixed(2)}
@@ -200,10 +201,11 @@ ${signal.takeProfit2 ? `🎯 *Take Profit 2:* ${signal.takeProfit2.toFixed(2)}` 
 ${signal.takeProfit3 ? `🎯 *Take Profit 3:* ${signal.takeProfit3.toFixed(2)}` : ''}
 
 📊 *Confidence:* ${signal.confidence}%
-⏰ *Time:* ${new Date().toLocaleTimeString('en-ZA', { timeZone: 'Africa/Johannesburg' })} SAST
+⏰ *Posted:* ${new Date().toLocaleTimeString('en-ZA', { timeZone: 'Africa/Johannesburg' })} SAST
 
 ━━━━━━━━━━━━━━━━━━━━
-🇿🇦 *Mzansi FX VIP* | Risk 1-2% per trade
+⚡ *Act fast!* Price moving. Risk 1-2% max.
+🇿🇦 *Mzansi FX VIP*
 `.trim();
 }
 

@@ -15,30 +15,34 @@ export function initBot(): Telegraf<Context> {
     const welcomeMessage = `
 🇿🇦 *Welcome to Mzansi FX VIP!* 🇿🇦
 
-Hey ${ctx.from?.first_name || 'Trader'}! 👋
+${ctx.from?.first_name || 'Trader'}, you're in! 👋
 
-You've just joined South Africa's fastest-growing forex signals community.
+While you were scrolling, our members just banked +47 pips on Gold today.
 
-📊 *What you'll get:*
-• FREE Gold (XAUUSD) signals
+🔥 *You're now getting:*
+• FREE Gold signals (posted live)
 • FREE NAS100 signals
-• Entry, SL & TP levels
-• Real-time trade tracking
-• Weekly performance recaps
+• Exact entry + exit levels
+• Real-time profit tracking
+• Weekly winner spotlights
 
-💡 *Quick tip:* Enable notifications so you never miss a signal!
+⚠️ *Don't miss out:* Turn on notifications. Entry windows close fast.
 
 ━━━━━━━━━━━━━━━━━━━━
 
-🔗 *Ready to trade?*
-Open a PU Prime account (FSCA regulated):
+💰 *Ready to trade these signals?*
+
+Open MY PU Prime account now:
 ${config.affiliateLink}
 
-💰 Minimum deposit: Just R1,500
-🏦 ZAR deposits via local banks
+✅ Start with R1,500
+✅ FSCA regulated (safe for SA)
+✅ ZAR deposits via local banks
+
+*Next signal drops in 2 hours.* Will you be ready?
 
 ━━━━━━━━━━━━━━━━━━━━
-We eat, you eat! 🍽️
+🇿🇦 We eat, you eat! 🍽️
 `.trim();
 
     await ctx.replyWithMarkdown(welcomeMessage);
@@ -47,19 +51,21 @@ We eat, you eat! 🍽️
   // Help command
   bot.help(async (ctx) => {
     const helpMessage = `
-📚 *Mzansi FX VIP Commands*
+📚 *Quick Commands*
 
-/start - Welcome message
-/help - Show this help
-/status - Check bot status
-/signals - View recent signals
+/start - See what you're missing
+/help - This menu
+/status - Bot status
+/signals - Recent wins
 
 ━━━━━━━━━━━━━━━━━━━━
 
-📢 *Channel:* @MzansiFxVIP
-🔗 *Broker:* ${config.affiliateLink}
+💡 *Pro tip:* Most traders profit within their first week. The only losers? Those who never start.
 
-Questions? Message @MzansiFxVIP
+🔗 *Open MY account:* ${config.affiliateLink}
+📢 *Channel:* @MzansiFxVIP
+
+Questions? DM @MzansiFxVIP
 `.trim();
 
     await ctx.replyWithMarkdown(helpMessage);
@@ -90,21 +96,35 @@ Questions? Message @MzansiFxVIP
     }
   });
 
-  // Admin command: Post FOMO now
-  bot.command('postfomo', async (ctx) => {
+  // Admin command: Check signals status
+  bot.command('trackerstatus', async (ctx) => {
     const userId = ctx.from?.id;
     if (!userId || (ADMIN_IDS.length > 0 && !ADMIN_IDS.includes(userId))) {
       await ctx.reply('⛔ Admin only command');
       return;
     }
 
-    await ctx.reply('🔥 Generating and posting FOMO screenshot...');
     try {
-      const { runFomoNow } = await import('../schedulers/index.js');
-      await runFomoNow();
-      await ctx.reply('✅ FOMO post sent to channel!');
+      const { signalCache } = await import('../services/signal-cache.js');
+      const stats = signalCache.getStats();
+      const count = signalCache.getCount();
+
+      const message = `
+📊 *Signal Cache Status*
+━━━━━━━━━━━━━━━━━━━━
+
+📝 Total Signals: ${count.total}
+⚡ Active: ${count.active}
+✅ Wins: ${stats.wins}
+❌ Losses: ${stats.losses}
+⏰ Expired: ${stats.expired}
+📈 Win Rate: ${stats.winRate}%
+💰 Total Pips: ${stats.totalPips}
+`.trim();
+
+      await ctx.replyWithMarkdown(message);
     } catch (error) {
-      console.error('Post FOMO error:', error);
+      console.error('Tracker status error:', error);
       await ctx.reply(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   });

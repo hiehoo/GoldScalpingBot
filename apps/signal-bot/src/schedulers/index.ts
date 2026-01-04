@@ -1,93 +1,125 @@
 import cron from 'node-cron';
 import { config } from '../config.js';
 import { generateAllSignals, formatSignalMessage } from '../services/signal-generator.js';
-import { renderSignalChart } from '../services/chart-renderer.js';
-import { generateFomoData, renderFomoScreenshot, formatFomoCaption } from '../services/fomo-generator.js';
-import { checkAllSignals, formatTrackingUpdate, trackSignal } from '../services/price-tracker.js';
-import { fetchCandles } from '../services/market-data.js';
-import { postToChannel, postImageToChannel, postAffiliateCTA } from '../bot/channel-poster.js';
-import { generateWeeklyRecap, generateMonthlyRecap, recordSignalResult } from '../bot/recap-generator.js';
+import { signalCache } from '../services/signal-cache.js';
+import { checkAllSignals, formatTrackingResult, reviewExpiredSignals, formatExpiredMessage } from '../services/price-tracker.js';
+import { getCurrentPrice } from '../services/market-data.js';
+import { postToChannel } from '../bot/channel-poster.js';
+import { generateWeeklyRecap, recordSignalResult } from '../bot/recap-generator.js';
+import type { CachedSignal } from '../types/index.js';
 
 const { schedulers } = config;
 
 /**
- * Signal generation task - runs every hour
+ * Convert TradingSignal to CachedSignal for storage
+ */
+function toCachedSignal(signal: Awaited<ReturnType<typeof generateAllSignals>>[number]): CachedSignal {
+  const now = new Date();
+  const expiresAt = new Date(now.getTime() + config.signals.expiryMinutes * 60 * 1000);
+
+  return {
+    id: signal.id,
+    symbol: signal.symbol,
+    direction: signal.direction,
+    entryPrice: signal.entryPrice,
+    stopLoss: signal.stopLoss,
+    takeProfit1: signal.takeProfit1,
+    takeProfit2: signal.takeProfit2,
+    takeProfit3: signal.takeProfit3,
+    confidence: signal.confidence,
+    createdAt: now.toISOString(),
+    expiresAt: expiresAt.toISOString(),
+    status: 'ACTIVE',
+  };
+}
+
+/**
+ * Signal generation task - runs every 4 hours
+ * Posts signal message to Telegram (no chart image)
  */
 async function signalTask(): Promise<void> {
-  console.log('⏰ Running signal generation task...');
+  console.log('[Scheduler] Running signal generation task...');
 
   try {
     const signals = await generateAllSignals();
 
     for (const signal of signals) {
-      // Get candles for chart
-      const candles = await fetchCandles(signal.symbol);
-
-      // Render chart
-      const chartBuffer = await renderSignalChart(candles, signal);
-
-      // Format message
+      // Format message (text only, no chart)
       const message = formatSignalMessage(signal);
 
       // Post to channel
-      await postImageToChannel(chartBuffer, message);
+      await postToChannel(message);
 
-      // Track signal for SL/TP monitoring
-      trackSignal(signal);
+      // Cache signal for tracking
+      const cachedSignal = toCachedSignal(signal);
+      signalCache.add(cachedSignal);
 
-      console.log(`📤 Signal posted: ${signal.symbol} ${signal.direction}`);
+      console.log(`[Scheduler] Signal posted: ${signal.symbol} ${signal.direction}`);
     }
 
     if (signals.length === 0) {
-      console.log('ℹ️ No signals generated this hour');
+      console.log('[Scheduler] No signals generated this cycle');
     }
   } catch (error) {
-    console.error('Signal task error:', error);
-  }
-}
-
-/**
- * FOMO post task - runs every 4 hours
- */
-async function fomoTask(): Promise<void> {
-  console.log('⏰ Running FOMO post task...');
-
-  try {
-    const fomoData = generateFomoData();
-    const screenshot = await renderFomoScreenshot(fomoData);
-    const caption = formatFomoCaption(fomoData);
-
-    await postImageToChannel(screenshot, caption);
-    console.log('📤 FOMO post sent');
-  } catch (error) {
-    console.error('FOMO task error:', error);
+    console.error('[Scheduler] Signal task error:', error);
   }
 }
 
 /**
  * Price tracker task - runs every 15 minutes
+ * Checks for TP/SL hits and posts results
  */
 async function trackerTask(): Promise<void> {
-  console.log('⏰ Running price tracker task...');
+  console.log('[Scheduler] Running price tracker task...');
 
   try {
     const results = await checkAllSignals();
 
     for (const result of results) {
-      const message = formatTrackingUpdate(result);
+      const message = formatTrackingResult(result);
       await postToChannel(message);
 
       // Record for recaps
-      recordSignalResult(result.pipsGained, result.newStatus === 'TP_HIT');
+      const isWin = result.newStatus.startsWith('WIN_');
+      recordSignalResult(result.pnlPips, isWin);
 
-      console.log(`📤 Tracking update: ${result.signal.symbol} ${result.newStatus}`);
+      console.log(`[Scheduler] Result posted: ${result.signal.symbol} ${result.newStatus}`);
     }
 
     if (results.length === 0) {
-      console.log('ℹ️ No signals closed this check');
+      console.log('[Scheduler] No signals closed this check');
     }
   } catch (error) {
-    console.error('Tracker task error:', error);
+    console.error('[Scheduler] Tracker task error:', error);
+  }
+}
+
+/**
+ * Signal review task - runs 5 minutes after signal generation
+ * Marks expired signals and posts summary
+ */
+async function signalReviewTask(): Promise<void> {
+  console.log('[Scheduler] Running signal review task...');
+
+  try {
+    const expiredSignals = await reviewExpiredSignals();
+
+    for (const signal of expiredSignals) {
+      try {
+        const currentPrice = await getCurrentPrice(signal.symbol);
+        const message = formatExpiredMessage(signal, currentPrice);
+        await postToChannel(message);
+        console.log(`[Scheduler] Expired signal posted: ${signal.id}`);
+      } catch (error) {
+        console.error(`[Scheduler] Failed to post expired signal ${signal.id}:`, error);
+      }
+    }
+
+    if (expiredSignals.length === 0) {
+      console.log('[Scheduler] No expired signals to review');
+    }
+  } catch (error) {
+    console.error('[Scheduler] Signal review task error:', error);
   }
 }
 
@@ -95,58 +127,91 @@ async function trackerTask(): Promise<void> {
  * Weekly recap task - runs Sunday 8PM SAST
  */
 async function weeklyRecapTask(): Promise<void> {
-  console.log('⏰ Running weekly recap task...');
+  console.log('[Scheduler] Running weekly recap task...');
 
   try {
     const recap = generateWeeklyRecap();
     await postToChannel(recap);
-    console.log('📤 Weekly recap posted');
+    console.log('[Scheduler] Weekly recap posted');
   } catch (error) {
-    console.error('Weekly recap error:', error);
+    console.error('[Scheduler] Weekly recap error:', error);
   }
 }
 
 /**
  * Daily recap task - runs 8PM SAST
+ * Posts signal stats summary
  */
 async function dailyRecapTask(): Promise<void> {
-  console.log('⏰ Running daily recap task...');
+  console.log('[Scheduler] Running daily recap task...');
 
   try {
-    // Post affiliate CTA 2x per week (Tuesday & Thursday)
-    const today = new Date().getDay();
-    if (today === 2 || today === 4) {
-      await postAffiliateCTA();
-      console.log('📤 Affiliate CTA posted');
+    const stats = signalCache.getStats();
+
+    if (stats.wins + stats.losses + stats.expired === 0) {
+      console.log('[Scheduler] No signals to recap today');
+      return;
     }
+
+    const message = `
+📊 *DAILY STATS* 📊
+━━━━━━━━━━━━━━━━━━━━
+
+✅ Wins: ${stats.wins}
+❌ Losses: ${stats.losses}
+⏰ Expired: ${stats.expired}
+📈 Win Rate: ${stats.winRate}%
+💰 Total Pips: ${stats.totalPips >= 0 ? '+' : ''}${stats.totalPips}
+
+━━━━━━━━━━━━━━━━━━━━
+🇿🇦 Mzansi FX VIP
+`.trim();
+
+    await postToChannel(message);
+    console.log('[Scheduler] Daily stats posted');
   } catch (error) {
-    console.error('Daily recap error:', error);
+    console.error('[Scheduler] Daily recap error:', error);
+  }
+}
+
+/**
+ * Initialize signal cache before starting schedulers
+ */
+async function initializeCache(): Promise<void> {
+  try {
+    await signalCache.init();
+    console.log('[Scheduler] Signal cache initialized');
+  } catch (error) {
+    console.error('[Scheduler] Failed to initialize signal cache:', error);
   }
 }
 
 /**
  * Start all schedulers
  */
-export function startSchedulers(): void {
-  console.log('🕐 Starting schedulers...');
+export async function startSchedulers(): Promise<void> {
+  console.log('[Scheduler] Starting schedulers...');
 
-  // Signal generation - every hour at :00
+  // Initialize cache first
+  await initializeCache();
+
+  // Signal generation - every 4 hours at :00
   cron.schedule(schedulers.signals, signalTask, {
     timezone: 'Africa/Johannesburg',
   });
   console.log(`  📊 Signals: ${schedulers.signals}`);
-
-  // FOMO posts - every 4 hours
-  cron.schedule(schedulers.fomo, fomoTask, {
-    timezone: 'Africa/Johannesburg',
-  });
-  console.log(`  🔥 FOMO: ${schedulers.fomo}`);
 
   // Price tracker - every 15 minutes
   cron.schedule(schedulers.priceTracker, trackerTask, {
     timezone: 'Africa/Johannesburg',
   });
   console.log(`  📍 Tracker: ${schedulers.priceTracker}`);
+
+  // Signal review - 5 minutes after signal generation
+  cron.schedule(schedulers.signalReview, signalReviewTask, {
+    timezone: 'Africa/Johannesburg',
+  });
+  console.log(`  🔍 Review: ${schedulers.signalReview}`);
 
   // Daily recap - 8PM SAST
   cron.schedule(schedulers.dailyRecap, dailyRecapTask, {
@@ -160,28 +225,30 @@ export function startSchedulers(): void {
   });
   console.log(`  🏆 Weekly: ${schedulers.weeklyRecap}`);
 
-  console.log('✅ All schedulers started');
+  console.log('[Scheduler] All schedulers started');
 }
 
 /**
  * Run a one-time signal generation (for testing)
  */
 export async function runSignalNow(): Promise<void> {
+  await initializeCache();
   await signalTask();
 }
 
 /**
- * Run a one-time FOMO post (for testing)
+ * Run a one-time tracker check (for testing)
  */
-export async function runFomoNow(): Promise<void> {
-  await fomoTask();
+export async function runTrackerNow(): Promise<void> {
+  await initializeCache();
+  await trackerTask();
 }
 
 export const scheduler = {
   startSchedulers,
   runSignalNow,
-  runFomoNow,
+  runTrackerNow,
   signalTask,
-  fomoTask,
   trackerTask,
+  signalReviewTask,
 };

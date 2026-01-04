@@ -73,44 +73,62 @@ export async function postFomoScreenshot(
  */
 export async function postAffiliateCTA(): Promise<void> {
   const ctaMessages = [
+    // FOMO angle
     `
-💼 *Ready to trade these signals?*
+⚠️ *Don't watch profits from the sidelines.*
 
-Open a PU Prime account today:
-✅ FSCA regulated (safe for SA traders)
-✅ Deposit from R1,500
-✅ Local bank deposits (Capitec, FNB, ABSA)
-✅ Fast ZAR withdrawals
+847 members already trading our signals.
++312 pips banked this week.
 
+You scrolling or earning?
+
+Open MY PU Prime account:
 👉 ${config.affiliateLink}
+
+✅ Start with R1,500
+✅ FSCA regulated (safe for SA)
+✅ ZAR deposits (Capitec, FNB, ABSA)
+
+*Next signal drops soon.* Will you be ready?
 
 🇿🇦 *Mzansi FX VIP*
 `.trim(),
+    // Loss aversion angle
     `
-🔥 *Stop watching from the sidelines!*
+💸 *Every signal you skip is money left on the table.*
 
-Our traders are banking profits daily. You could be next.
+Last signal: +47 pips in 2 hours.
+Week-to-date: +312 pips.
 
-Get started with PU Prime:
-• Minimum R1,500 deposit
-• ZAR account available
-• FSCA regulated broker
+How much longer will you wait?
 
+Get started NOW:
 👉 ${config.affiliateLink}
 
-We eat, you eat! 🍽️
+✅ R1,500 minimum deposit
+✅ Fast ZAR withdrawals
+✅ FSCA regulated
+
+The next winner could be yours. Or not.
+
+🇿🇦 We eat, you eat! 🍽️
 `.trim(),
+    // Social proof angle
     `
-📈 *Trading tip of the day:*
+🔥 *Real traders. Real profits.*
 
-The best traders don't just watch signals... they ACT on them.
+"Banked +89 pips this week!" - Thabo, Johannesburg
+"Finally profitable!" - Zanele, Cape Town
+"Best signals in SA" - Sipho, Durban
 
-Ready to start? PU Prime makes it easy:
-🏦 Deposit via EFT or card
-💰 Trade from R1,500
-🛡️ FSCA regulated
-
+Join 847+ members trading with us:
 👉 ${config.affiliateLink}
+
+✅ FSCA regulated
+✅ Trade from R1,500
+✅ Local ZAR deposits
+
+Stop watching. Start winning.
 
 🇿🇦 *Mzansi FX VIP*
 `.trim(),

@@ -19,6 +19,39 @@ export interface MarketData {
 export type SignalDirection = 'BUY' | 'SELL';
 export type SignalStatus = 'ACTIVE' | 'TP_HIT' | 'SL_HIT' | 'EXPIRED' | 'MANUAL_CLOSE';
 
+// Cached signal types for win/loss tracking
+export type CachedSignalStatus =
+  | 'ACTIVE'
+  | 'WIN_TP1' | 'WIN_TP2' | 'WIN_TP3'
+  | 'LOSS_SL'
+  | 'EXPIRED';
+
+export interface CachedSignal {
+  id: string;
+  symbol: string;
+  direction: SignalDirection;
+  entryPrice: number;
+  stopLoss: number;
+  takeProfit1: number;
+  takeProfit2?: number;
+  takeProfit3?: number;
+  confidence: number;
+  createdAt: string;      // ISO timestamp
+  expiresAt: string;      // ISO timestamp (createdAt + 4h)
+  status: CachedSignalStatus;
+  closedAt?: string;      // ISO timestamp
+  closedPrice?: number;
+  pnlPips?: number;
+}
+
+export interface SignalStats {
+  wins: number;
+  losses: number;
+  expired: number;
+  winRate: number;
+  totalPips: number;
+}
+
 export interface TradingSignal {
   id: string;
   symbol: string;

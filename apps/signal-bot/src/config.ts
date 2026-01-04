@@ -33,7 +33,8 @@ export const config = {
 
   // Signal settings
   signals: {
-    intervalMinutes: 60, // Generate signals every hour
+    intervalMinutes: 240, // Generate signals every 4 hours
+    expiryMinutes: 240, // Signals expire after 4 hours
     riskRewardRatio: 2.5, // 1:2.5 risk-reward
     defaultStopLossPips: {
       gold: 150, // $1.50 for gold
@@ -43,11 +44,12 @@ export const config = {
 
   // Scheduler settings (cron expressions)
   schedulers: {
-    signals: '0 * * * *', // Every hour at :00
-    fomo: '0 */4 * * *', // Every 4 hours
-    priceTracker: '*/15 * * * *', // Every 15 minutes
+    signals: '0 */4 * * *', // Every 4 hours at :00 (0, 4, 8, 12, 16, 20)
+    priceTracker: '*/15 * * * *', // Every 15 minutes for TP/SL checks
+    signalReview: '5 */4 * * *', // 5 min after signal gen for cleanup
     dailyRecap: '0 20 * * *', // 8 PM daily (SAST)
     weeklyRecap: '0 20 * * 0', // Sunday 8 PM (SAST)
+    // FOMO scheduler removed - no longer generating FOMO posts
   },
 
   // Affiliate
